@@ -1,0 +1,7 @@
+import {Router} from 'express';import {pool} from '../db.js';import {requireAuth,requireRole} from '../middleware/auth.js';
+const r=Router();r.use(requireAuth);
+const query=`SELECT x.id AS "_id",x.motor_id AS motor,x.title,x.description,x.priority,x.status,x.due_date AS "dueDate",x.created_at AS "createdAt",json_build_object('_id',m.id,'name',m.name,'assetId',m.asset_id) AS motor_detail FROM maintenance x LEFT JOIN motors m ON m.id=x.motor_id`;
+const shape=row=>{if(!row)return row;const{motor_detail,...rest}=row;return{...rest,motor:motor_detail?._id?motor_detail:null};};
+r.get('/',async(_q,s,n)=>{try{const{rows}=await pool.query(`${query} ORDER BY x.created_at DESC`);s.json(rows.map(shape));}catch(e){n(e);}});
+r.post('/',requireRole('admin','engineer'),async(q,s,n)=>{try{const{motor,title,description,priority='medium',dueDate}=q.body;const{rows}=await pool.query(`INSERT INTO maintenance(motor_id,title,description,priority,due_date) VALUES($1,$2,$3,$4,$5) RETURNING id`,[motor||null,title,description,priority,dueDate||null]);const result=await pool.query(`${query} WHERE x.id=$1`,[rows[0].id]);s.status(201).json(shape(result.rows[0]));}catch(e){n(e);}});
+r.patch('/:id',async(q,s,n)=>{try{const{rows}=await pool.query('UPDATE maintenance SET status=$1 WHERE id=$2 RETURNING id',[q.body.status,q.params.id]);if(!rows[0])return s.status(404).json({message:'Maintenance item not found'});const result=await pool.query(`${query} WHERE x.id=$1`,[rows[0].id]);s.json(shape(result.rows[0]));}catch(e){n(e);}});export default r;

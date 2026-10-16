@@ -1,0 +1,4 @@
+import {Router} from 'express';import {pool} from '../db.js';import {requireAuth} from '../middleware/auth.js';
+const r=Router();r.use(requireAuth);
+r.get('/',async(_q,s,n)=>{try{const{rows}=await pool.query(`SELECT a.id AS "_id",a.severity,a.title,a.message,a.acknowledged,a.created_at AS "createdAt",json_build_object('_id',m.id,'name',m.name,'assetId',m.asset_id) AS motor FROM alerts a LEFT JOIN motors m ON m.id=a.motor_id ORDER BY a.created_at DESC LIMIT 200`);s.json(rows);}catch(e){n(e);}});
+r.patch('/:id/acknowledge',async(q,s,n)=>{try{const{rows}=await pool.query('UPDATE alerts SET acknowledged=TRUE WHERE id=$1 RETURNING id AS "_id",severity,title,message,acknowledged,created_at AS "createdAt"',[q.params.id]);if(!rows[0])return s.status(404).json({message:'Alert not found'});s.json(rows[0]);}catch(e){n(e);}});export default r;
